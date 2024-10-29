@@ -24,41 +24,38 @@ import numpy as np
 
 
 def check_synced(obj, name):
-  """Checks whether the object is synced across local devices.
+    """Checks whether the object is synced across local devices.
 
-  Args:
-    obj: PyTree with leaf nodes mapped over local devices.
-    name: the name of the object (for logging only).
+    Args:
+      obj: PyTree with leaf nodes mapped over local devices.
+      name: the name of the object (for logging only).
 
-  Returns:
-    True if object is in sync across all devices and False otherwise.
-  """
-  for i in range(1, jax.local_device_count()):
-    norms = jax.tree_map(lambda x: jnp.linalg.norm(x[0] - x[i]), obj)  # pylint: disable=cell-var-from-loop
-    total_norms = sum(jax.tree_leaves(norms))
-    if total_norms != 0.0:
-      logging.info(
-          '%s object is not synced across device 0 and %d. The total norm'
-          ' of the difference is %.5e. For specific detail inspect '
-          'the individual differences norms:\n %s.',
-          name, i, total_norms, str(norms)
-      )
-      return False
-  logging.info('%s objects are synced.', name)
-  return True
+    Returns:
+      True if object is in sync across all devices and False otherwise.
+    """
+    for i in range(1, jax.local_device_count()):
+        norms = jax.tree_map(lambda x: jnp.linalg.norm(x[0] - x[i]), obj)  # pylint: disable=cell-var-from-loop
+        total_norms = sum(jax.tree_leaves(norms))
+        if total_norms != 0.0:
+            logging.info(
+                "%s object is not synced across device 0 and %d. The total norm"
+                " of the difference is %.5e. For specific detail inspect "
+                "the individual differences norms:\n %s.",
+                name,
+                i,
+                total_norms,
+                str(norms),
+            )
+            return False
+    logging.info("%s objects are synced.", name)
+    return True
 
 
 def broadcast_to_hosts(x: jnp.ndarray) -> jnp.ndarray:
-  """Broadcast the given array from host 0 across hosts."""
+    """Broadcast the given array from host 0 across hosts."""
+    # Tile across local devices
+    x = jnp.array(x)
+    x = jnp.tile(x[None], (jax.local_device_count(),) + (1,) * x.ndim)
 
-  def main_mask(x):
-    # Mask all except the 0-th device
-    return jnp.where(jax.lax.axis_index('i') == 0, x, jnp.zeros_like(x))
-
-  with maps.Mesh(np.array(jax.devices()), ('all_devices',)):
-    return maps.xmap(
-        lambda: jax.lax.psum(main_mask(x), axis_name='i'),
-        in_axes=(),
-        out_axes={},
-        axis_sizes={'i': jax.device_count()},
-        axis_resources={'i': 'all_devices'})()
+    x_all = jax.pmap(lambda y: jax.lax.all_gather(y, "devices"), "devices")(x)
+    return x_all[0, 0]  # Take the first device on the first host
