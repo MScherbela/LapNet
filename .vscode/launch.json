@@ -5,6 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Scaling",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/scherbelam20/develop/LapNet/lapnet/run_scaling_test.py",
+            "cwd": "/storage/scherbelam20/runs/lapnet",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "2",
+                "JAX_DEBUG_NANS": "1",
+                "NVIDIA_TF32_OVERRIDE": "0",
+                "JAX_DEFAULT_MATMUL_PRECISION": "float32"
+            },
+            "args": [
+                "--model",
+                "ferminet",
+            ]
+        },
+        {
             "name": "LapNet main",
             "type": "debugpy",
             "request": "launch",
